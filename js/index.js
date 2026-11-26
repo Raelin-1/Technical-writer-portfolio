@@ -109,15 +109,64 @@ document.querySelectorAll('.experience .job').forEach(function (job, i) {
       document.title = lang === 'ru' ? RU_TITLE : EN_TITLE;
     }
  
-    document.querySelectorAll('.lang a').forEach(function (a) {
+    // Language in the URL: ?lang=ru or ?lang=en (the #anchor is preserved)
+
+     var langLinks = document.querySelectorAll('.lang a');
+
+    function getUrlLang() {
+      var lang = new URLSearchParams(location.search).get('lang');
+      return lang === 'ru' || lang === 'en' ? lang : null;
+    }
+
+    function urlFor(lang) {
+      var url = new URL(location.href);
+      url.searchParams.set('lang', lang);
+      return url.href;
+    }
+
+    function save(lang) {
+      try { localStorage.setItem('lang', lang); } catch (err) {}
+    }
+
+    // keep real addresses on the links, so "open in new tab" and "copy link" work
+    function updateLinks() {
+      langLinks.forEach(function (a) { a.href = urlFor(a.dataset.lang); });
+    }
+
+    langLinks.forEach(function (a) {
       a.addEventListener('click', function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; // let the browser handle it
         e.preventDefault();
-        apply(a.dataset.lang);
-        try { localStorage.setItem('lang', a.dataset.lang); } catch (err) {}
+        var lang = a.dataset.lang;
+        if (lang !== document.documentElement.lang) {
+          history.pushState(null, '', urlFor(lang));
+          apply(lang);
+          updateLinks();
+        }
+        save(lang);
       });
     });
- 
+
+    // Back / Forward buttons
+    window.addEventListener('popstate', function () {
+      var lang = getUrlLang() || 'en';
+      if (lang !== document.documentElement.lang) {
+        apply(lang);
+        save(lang);
+      }
+      updateLinks();
+    });
+
+    window.addEventListener('hashchange', updateLinks);
+
+    // On page load: URL first, then the saved choice, then English
     var saved = null;
     try { saved = localStorage.getItem('lang'); } catch (err) {}
-    if (saved === 'ru') apply('ru');
+    var fromUrl = getUrlLang();
+    var initial = fromUrl || (saved === 'ru' ? 'ru' : 'en');
+
+    if (initial === 'ru') apply('ru');
+    if (fromUrl) save(fromUrl);
+    else if (initial === 'ru') history.replaceState(null, '', urlFor('ru'));
+    updateLinks();
   })();
